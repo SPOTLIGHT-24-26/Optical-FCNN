@@ -29,24 +29,25 @@ tAcc = []
 vAcc = []
 timeAccumulator = [0.]
 
+# --------------------------Data Parameters--------------------------
 mode = 'fourier'
 #mode = 'spatial'
-#mode = 'digital'
+#mode = 'fftLin'
+#Note : fftlin is similar to spatial/digital but flattens the images
 
 # dataName = 'cifar'
 # imSize = 32
 # imChannels = 3
-dataName = 'mnist'
-imSize = 8
-imChannels = 1
-# dataName = 'fMnist'
-# imSize = 28
+# dataName = 'mnist'
+# imSize = 20
 # imChannels = 1
+dataName = 'fmnist'
+imSize = 28
+imChannels = 1
 
-numComponents = 8
+numComponents = 28
 
-# Note: for Fourier CNNs, always set normalize=False
-mnistData =  data_loader.MnistData(mode, False, batch_size, numComponents=numComponents)
+mnistData =  data_loader.MnistData(dataName, mode, batch_size, numComponents=numComponents)
 trainLoader, testLoader = mnistData.getDataLoaders()
 # cifarData =  data_loader.CifarData(mode, True, batch_size)
 # trainLoader, testLoader = cifarData.getDataLoaders()
@@ -70,17 +71,15 @@ trainLoader, testLoader = mnistData.getDataLoaders()
 #model = models.simpleCNN(device, imChannels, imSize)
 model = models.simpleFCNN(device, imChannels, imSize)
 #model = models.simpleDCNN(device, imChannels, imSize)
-
-#model = models.dummyTest(device, imChannels, imSize)
-
-#model.load_state_dict(torch.load('models/cifar_fourier_model_20250228_103005_97_sqLoss', weights_only=True))
+#model = models.fftLinear(in_features=imSize*imSize, layer1_out_features=1024, miniblock=8, device=device)
+#model = models.FFTConv(imChannels=imChannels, imSize=imSize, miniblock=2, device=device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
-#optimizer = optim.SGD(model.parameters(), lr=lr, momentum=moment)
+#scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.5)
 
 # load checkpoint
-# checkpoint = torch.load('models/mnist_fourier_0521_1121_1e-05_8_192_chkPnt.tar', weights_only=True)
+# checkpoint = torch.load('models/mnist_fourier_0528_1733_1e-05_20_100_chkPnt.tar', weights_only=True)
 # model.load_state_dict(checkpoint['model_state_dict'])
 # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 # epoch = checkpoint['epoch']
@@ -119,6 +118,7 @@ for epoch in range(EPOCHS):
     t0 = time.time()
     avg_loss, avg_acc = train_one_epoch(epoch)
     timeAccumulator.append(timeAccumulator[-1] + time.time() - t0)
+    #scheduler.step()
 
     running_vloss = 0.0
     running_vacc = 0.0
@@ -164,7 +164,7 @@ for epoch in range(EPOCHS):
         best_vloss = avg_vloss
         best_vacc = avg_vacc
         bestEpochNum = epoch + 1
-        model_path = 'models/'+ dataName + '_' + mode + '_{}_{}_{}_{}'.format(timestamp, lr, numComponents, epoch + 1)
+        model_path = 'models/'+ dataName + '_' + mode + '_{}_{}_{}_{}'.format(timestamp, lr, numComponents, bestEpochNum)
         bestModel = model.state_dict()
     # stop training if loss is diverging
     # if epoch - bestEpochNum > 15:
@@ -191,7 +191,7 @@ print('Time, epoch: {} or: {}'.format(timeAccumulator[1], timeAccumulator[-1]/(E
 # saved_model.load_state_dict(torch.load(PATH))
 
 # write lists to files
-file_path = 'result_lists/' + dataName + '_' + mode + '_' + str(lr) + '_' + str(timestamp) + '_' + str(numComponents) + '_' + str(bestEpochNum) + '.json'
+file_path = 'result_lists/' + dataName + '_' + mode + '_{}_{}_{}_{}'.format(timestamp, lr, numComponents, bestEpochNum) + '.json'
 out_dict = {"tLoss": tLoss, "vLoss": vLoss, "tAcc": tAcc, "vAcc": vAcc}
 json.dump(out_dict,open(file_path,"w"), indent=2)
 #out_dict = json.load(open(file_path,"r"))

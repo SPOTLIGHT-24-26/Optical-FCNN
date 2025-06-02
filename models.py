@@ -3,6 +3,7 @@ import torch.nn as nn
 import torchonn as onn
 from torchonn.models import ONNBaseModel
 import torch.nn.functional as F
+from torch.types import Device
 
 import numpy as np
 
@@ -77,12 +78,19 @@ class simpleCNN(ONNBaseModel):
         self.linear1.reset_parameters()
         self.linear2.reset_parameters()
 
+    # Swish activation function
+    def swish(self, x):
+        return x*torch.sigmoid(x)
+    
     def forward(self, x):
-        x= torch.relu(self.conv1(x))
-        x=torch.relu(self.conv2(x))
-        x=self.pool(x)
+        #x= torch.relu(self.conv1(x))
+        #x=torch.relu(self.conv2(x))
+        x = self.swish(self.conv1(x))
+        x = self.swish(self.conv2(x))
+        x = self.pool(x)
         x = x.flatten(1)
-        x = torch.relu(self.linear1(x))
+        #x = torch.relu(self.linear1(x))
+        x = self.swish(self.linear1(x))
         x = self.linear2(x)
         return x
     
@@ -162,25 +170,161 @@ class simpleFCNN(ONNBaseModel):
         self.conv2.reset_parameters()
         self.linear1.reset_parameters()
         self.linear2.reset_parameters()
+    
+    def swish(self, x):
+        return x*torch.sigmoid(x)
 
     def forward(self, x):
-        x = self.EOActivation(self.conv1(x))
-        x = self.EOActivation(self.conv2(x))
-        # clip x to a size similar to maxPooling in spatial CNNs (mnist=12, cifar=14)
-        #startIdx = (self.poolSize-self.denseLayerDims)//2
-        #endIdx = startIdx + self.denseLayerDims
-        #x = x[:,:,startIdx:endIdx,startIdx:endIdx]
+        #x = self.EOActivation(self.conv1(x))
+        #x = self.EOActivation(self.conv2(x))
+        x = self.swish(self.conv1(x))
+        x = self.swish(self.conv2(x))
         x = x.flatten(1)
-        x = self.EOActivation(self.linear1(x))
+        #x = self.EOActivation(self.linear1(x))
+        x = self.swish(self.linear1(x))
         x = self.linear2(x)
         x = torch.square(x.real) + torch.square(x.imag)
-        #x = self.linear2(x)
-        #x = torch.square(x.real) + torch.square(x.imag)
+        return x
+
+class fftLinear(ONNBaseModel):
+
+    __constants__ = [
+        "in_features",
+        "layer1_out"
+    ]
+
+    in_features: int
+    layer1_out: int
+
+    def __init__(self,
+                 in_features: int,
+                 layer1_out_features: int,
+                 miniblock: int = 4,
+                 device: Device = torch.device("cpu")
+                 ):
+        super().__init__()
+
+        self.in_features = in_features
+        self.device = device
+
+        self.layer1_out_features = layer1_out_features
+        self.miniblock = miniblock
+        miniblock2 = 1
+
+        self.lin1 = onn.layers.FFTONNBlockLinear(
+            in_features = in_features,
+            out_features = self.layer1_out_features,
+            miniblock = self.miniblock,
+            device = self.device
+        )
+        self.lin2 = onn.layers.FFTONNBlockLinear(
+            in_features = self.layer1_out_features,
+            out_features = 10,
+            miniblock = miniblock,
+            device = self.device
+        )
+
+        self.lin1.reset_parameters()
+        self.lin2.reset_parameters()
+
+    def swish(self, x):
+        return x*torch.sigmoid(x)
+    
+    def forward(self, x):
+        x = self.swish(self.lin1(x))
+        x = self.lin2(x)
         return x
     
+class FFTConv(ONNBaseModel):
+    def __init__(self,
+                 imChannels: int = 1,
+                 imSize: int = 28,
+                 miniblock: int = 4,
+                 device=torch.device("cpu")):
+        super().__init__()
+        '''
+        CNN model with fft convolution layers proposed in
+        "Gu, Jiaqi, et al. "Toward hardware-efficient optical neural networks: Beyond FFT architecture 
+        via joint learnability." IEEE Transactions on Computer-Aided Design of Integrated Circuits and 
+        Systems 40.9 (2020): 1796-1809."
+        Inputs:
+            imChannels: int, number of channels in input image
+            imSize: int, 2D size of input images (input images assumed to be square)
+            miniblock: int, size of miniblock - choose from (1,2,4,8)
+            device: torch.Device, cpu or cuda
+        '''
+
+        self.conv1 = onn.layers.FFTONNBlockConv2d(
+            in_channels=imChannels,
+            out_channels=32,
+            kernel_size=3,
+            stride=1,
+            padding=0,
+            bias = True,
+            miniblock = miniblock,
+            photodetect = False,
+            device = device
+        )
+        self.conv2 = onn.layers.FFTONNBlockConv2d(
+            in_channels=32,
+            out_channels=64,
+            kernel_size=3,
+            stride=1,
+            padding=0,
+            bias = True,
+            miniblock = miniblock,
+            photodetect = False,
+            device = device
+        )
+
+        # Calculate dense layer dimensions
+        self.pool = nn.MaxPool2d(2)
+        linLayerIn = (imSize - 4)//2
+
+        self.linear1 = onn.layers.MZIBlockLinear(
+            in_features=64*linLayerIn*linLayerIn,
+            out_features=128,
+            bias=True,
+            miniblock=miniblock,
+            mode="usv",
+            decompose_alg="clements",
+            photodetect=False,
+            dtype=torch.float,
+            device=device,
+        )
+        self.linear2 = onn.layers.MZIBlockLinear(
+            in_features=128,
+            out_features=10,
+            bias=True,
+            miniblock=miniblock,
+            mode="usv",
+            decompose_alg="clements",
+            photodetect=True,
+            dtype=torch.float,
+            device=device,
+        )
+        # reset parameters
+        self.conv1.reset_parameters()
+        self.conv2.reset_parameters()
+        self.linear1.reset_parameters()
+        self.linear2.reset_parameters()
+
+    # Swish activation function
+    def swish(self, x):
+        return x*torch.sigmoid(x)
+    
+    def forward(self, x):
+        x = self.swish(self.conv1(x))
+        x = self.swish(self.conv2(x))
+        x = self.pool(x)
+        x = x.flatten(1)
+        x = self.swish(self.linear1(x))
+        x = self.linear2(x)
+        return x
+
 class simpleDCNN(nn.Module):
     def __init__(self,
-                 device=torch.device("cuda"),
+                 device = torch.device("cuda"),
                  imChannels: int = 1,
                  imSize: int = 28):
         super(simpleDCNN, self).__init__()
@@ -219,12 +363,19 @@ class simpleDCNN(nn.Module):
             device=device,
         )
 
+    # Swish activation function
+    def swish(self, x):
+        return x*torch.sigmoid(x)
+
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
+        #x = F.relu(self.conv1(x))
+        #x = F.relu(self.conv2(x))
+        x = self.swish(self.conv1(x))
+        x = self.swish(self.conv2(x))
         x = self.pool(x)
         x = x.flatten(1)
-        x = F.relu(self.linear1(x))
+        #x = F.relu(self.linear1(x))
+        x = self.swish(self.linear1(x))
         x = torch.square(torch.abs(self.linear2(x)))
         return x
     

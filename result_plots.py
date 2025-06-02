@@ -88,7 +88,7 @@ ax2.legend(loc="lower right", prop = { "size": 25 })
 
 # ------------------Phase perturbations and evaluation---------------------------
 modelPaths = [['models/abs_squared_final/mnist_spatial_model_20250319_124749_1e-06_28_100.pt',
-               'models/abs_squared_final/mnist_fourier_model_20250317_150048_1e-05_28_184_chkPnt.tar',
+               'models/abs_squared_final/mnist_fourier_model_20250317_150048_1e-05_28_184.pt',
                'models/abs_squared_final/mnist_fourier_model_20250314_151634_1e-05_20_292.pt'],
                ['models/abs_squared_final/fMnist_spatial_model_20250325_182622_1e-06_28_100.pt',
                 'models/abs_squared_final/fMnist_fourier_model_20250319_192911_1e-05_28_107.pt',
@@ -111,7 +111,7 @@ batch_size = 64
 # acc[1,2,0] = 85.0
 
 for d in range(2):
-    for m in range(1):
+    for m in range(3):
         #model = None
         testSet = None
         if dataName[d] == 'mnist':
@@ -136,9 +136,9 @@ for d in range(2):
         if mode[m] == 'spatial':
             U1, S1, V1 = model.conv1.U, model.conv1.S, model.conv1.V
             U2, S2, V2 = model.conv2.U, model.conv2.S, model.conv2.V
-        #else:
-            #w1 = torch.acos(model.conv1.weight)
-            #w2 = torch.acos(model.conv2.weight)
+        else:
+            w1 = torch.acos(model.conv1.weight)
+            w2 = torch.acos(model.conv2.weight)
         print("Original accuracy - data {}, model {}, components {} = {}".format(dataName[d], mode[m], numComponents[m], acc[d,m,0]))
         for ind, s in enumerate(sigma):
             if mode[m] == 'spatial':
@@ -151,11 +151,11 @@ for d in range(2):
                 model.conv2.U.data = U2 + torch.from_numpy(dThetaU2.astype('float32')).to(device)
                 model.conv2.S.data = S2 + torch.from_numpy(dThetaS2.astype('float32')).to(device)
                 model.conv2.V.data = V2 + torch.from_numpy(dThetaV2.astype('float32')).to(device)
-            #else:
-            #    dTheta1 = np.random.normal(scale=s, size=w1.shape)
-            #    dTheta2 = np.random.normal(scale=s, size=w2.shape)
-                #model.conv1.weight.data = torch.cos(w1 + torch.from_numpy(dTheta1.astype('float32')).to(device))
-                #model.conv2.weight.data = torch.cos(w2 + torch.from_numpy(dTheta2.astype('float32')).to(device)) 
+            else:
+                dTheta1 = np.random.normal(scale=s, size=w1.shape)
+                dTheta2 = np.random.normal(scale=s, size=w2.shape)
+                model.conv1.weight.data = torch.cos(w1 + torch.from_numpy(dTheta1.astype('float32')).to(device))
+                model.conv2.weight.data = torch.cos(w2 + torch.from_numpy(dTheta2.astype('float32')).to(device)) 
             # evaluate on the test set
             running_vacc = 0.0
             model.eval()
