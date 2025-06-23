@@ -4,8 +4,10 @@ import torchonn as onn
 from torchonn.models import ONNBaseModel
 import torch.nn.functional as F
 from torch.types import Device
+from pyutils.general import logger
 
 import numpy as np
+import time
 
 class simpleCNN(ONNBaseModel):
     def __init__(self,
@@ -68,7 +70,7 @@ class simpleCNN(ONNBaseModel):
             miniblock=4,
             mode="usv",
             decompose_alg="clements",
-            photodetect=True,
+            photodetect=False,
             dtype=torch.float,
             device=device,
         )
@@ -125,7 +127,7 @@ class simpleFCNN(ONNBaseModel):
         self.poolSize -= 2
         self.denseLayerDims = self.poolSize//2
         self.conv2 = onn.layers.FourierConv2d(
-            in_channels=32,
+            in_channels=1,
             out_channels=64,
             kernel_size=3,
             pool_size=self.denseLayerDims,
@@ -139,7 +141,7 @@ class simpleFCNN(ONNBaseModel):
             in_features=64*self.denseLayerDims*self.denseLayerDims,
             out_features=128,
             bias=True,
-            miniblock=4,
+            miniblock=8,
             mode="usv",
             decompose_alg="clements",
             dtype=torch.cfloat,
@@ -150,7 +152,7 @@ class simpleFCNN(ONNBaseModel):
             in_features=128,
             out_features=10,
             bias=True,
-            miniblock=4,
+            miniblock=8,
             mode="usv",
             decompose_alg="clements",
             photodetect=True,
@@ -175,9 +177,12 @@ class simpleFCNN(ONNBaseModel):
         return x*torch.sigmoid(x)
 
     def forward(self, x):
+        # EOActivation has discrepancies near 0. Swish helps in better training
         #x = self.EOActivation(self.conv1(x))
         #x = self.EOActivation(self.conv2(x))
         x = self.swish(self.conv1(x))
+        # Combiner network simulation to sum all input channels
+        x = torch.sum(x, 1, keepdim=True)
         x = self.swish(self.conv2(x))
         x = x.flatten(1)
         #x = self.EOActivation(self.linear1(x))
@@ -209,7 +214,7 @@ class fftLinear(ONNBaseModel):
 
         self.layer1_out_features = layer1_out_features
         self.miniblock = miniblock
-        miniblock2 = 1
+        miniblock2 = 2
 
         self.lin1 = onn.layers.FFTONNBlockLinear(
             in_features = in_features,
@@ -325,33 +330,58 @@ class FFTConv(ONNBaseModel):
 class simpleDCNN(nn.Module):
     def __init__(self,
                  device = torch.device("cuda"),
-                 imChannels: int = 1,
-                 imSize: int = 28):
+                 imSize: int = 28,
+                 kernel_size: int = 3,
+                 num_layers: int = 2,
+                 num_channels: list = [1,32,64]):
         super(simpleDCNN, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels=imChannels,
-            out_channels=32,
-            kernel_size=3,
-            stride=1,
-            padding=0,
-            dilation=1,
-            bias=True,
-            device=device
+
+        self.fcTime = 0
+        self.kernel_size = kernel_size
+        self.num_layers = num_layers
+        self.num_channels = num_channels
+        # assert len(num_channels)==num_layers+1
+        assert len(num_channels)==(num_layers+1), logger.error(
+            f"num_channels should contain as many elements as num_layers"
         )
-        self.conv2 = nn.Conv2d(
-            in_channels=32,
-            out_channels=64,
-            kernel_size=3,
-            stride=1,
-            padding=0,
-            dilation=1,
-            bias=True,
-            device=device
-        )
+
+        self.convs = []
+        for i in range(self.num_layers):
+            self.convs.append(nn.Conv2d(
+                in_channels=self.num_channels[i],
+                out_channels=self.num_channels[i+1],
+                kernel_size=self.kernel_size,
+                stride=1,
+                padding=0,
+                dilation=1,
+                bias=True,
+                device=device
+            ))
+
+        # self.conv1 = nn.Conv2d(
+        #     in_channels=imChannels,
+        #     out_channels=32,
+        #     kernel_size=self.kernel_size,
+        #     stride=1,
+        #     padding=0,
+        #     dilation=1,
+        #     bias=True,
+        #     device=device
+        # )
+        # self.conv2 = nn.Conv2d(
+        #     in_channels=32,
+        #     out_channels=64,
+        #     kernel_size=self.kernel_size,
+        #     stride=1,
+        #     padding=0,
+        #     dilation=1,
+        #     bias=True,
+        #     device=device
+        # )
         self.pool = nn.MaxPool2d(2)
-        denseLayerDims = (imSize - 4)//2
+        denseLayerDims = (imSize - self.num_layers*(self.kernel_size-1))//2
         self.linear1 = nn.Linear(
-            in_features=64*denseLayerDims*denseLayerDims,
+            in_features=self.num_channels[-1]*denseLayerDims*denseLayerDims,
             out_features=128,
             bias=True,
             device=device,
@@ -366,17 +396,26 @@ class simpleDCNN(nn.Module):
     # Swish activation function
     def swish(self, x):
         return x*torch.sigmoid(x)
+    
+    def getFCTime(self):
+        return self.fcTime
 
     def forward(self, x):
-        #x = F.relu(self.conv1(x))
-        #x = F.relu(self.conv2(x))
-        x = self.swish(self.conv1(x))
-        x = self.swish(self.conv2(x))
+        # conv layers
+        for i in range(self.num_layers):
+            x = self.swish(self.convs[i](x))
+        # x = self.swish(self.conv1(x))
+        # x = self.swish(self.conv2(x))
         x = self.pool(x)
         x = x.flatten(1)
-        #x = F.relu(self.linear1(x))
+        # FC layers
+        torch.cuda.synchronize()
+        t0 = time.time()
         x = self.swish(self.linear1(x))
         x = torch.square(torch.abs(self.linear2(x)))
+        torch.cuda.synchronize()
+        t1 = time.time()
+        self.fcTime = t1-t0
         return x
     
 class dummyTest(nn.Module):

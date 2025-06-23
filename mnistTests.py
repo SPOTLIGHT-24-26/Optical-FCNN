@@ -15,7 +15,7 @@ import json
 device = "cuda" if torch.cuda.is_available() else "cpu"
 batch_size = 64
 EPOCHS = 100
-lr = 1e-5
+lr = 1e-4
 moment = 0.99
 
 best_vloss = 1_000_000.
@@ -30,60 +30,60 @@ vAcc = []
 timeAccumulator = [0.]
 
 # --------------------------Data Parameters--------------------------
-mode = 'fourier'
-#mode = 'spatial'
+#mode = 'fourier'
+mode = 'spatial'
 #mode = 'fftLin'
 #Note : fftlin is similar to spatial/digital but flattens the images
 
-# dataName = 'cifar'
-# imSize = 32
-# imChannels = 3
-# dataName = 'mnist'
-# imSize = 20
-# imChannels = 1
-dataName = 'fmnist'
-imSize = 28
+""" dataName = 'cifar10Color'
+imSize = 32
+imChannels = 3 """
+dataName = 'cifar10BW'
+imSize = 32
 imChannels = 1
+""" dataName = 'mnist'
+imSize = 14
+imChannels = 1 """
+""" dataName = 'fmnist'
+imSize = 28
+imChannels = 1 """
 
-numComponents = 28
+numComponents = 32
 
+# Name says 'mnist', but can load cifar10 in BW and color modes and fashion-mnist in both spatial and Fourier modes
 mnistData =  data_loader.MnistData(dataName, mode, batch_size, numComponents=numComponents)
 trainLoader, testLoader = mnistData.getDataLoaders()
-# cifarData =  data_loader.CifarData(mode, True, batch_size)
-# trainLoader, testLoader = cifarData.getDataLoaders()
-# fMnistData =  data_loader.FashionMnistData(mode, False, batch_size, numComponents)
-# trainLoader, testLoader = fMnistData.getDataLoaders()
 
 # Calculate dataset's mean and std
-# meanDatasetR, stdDatasetR = 0.0, 0.0
-# #meanDatasetI, stdDatasetI = 0.0, 0.0
-# for i, data in enumerate(trainLoader):
-#     input, _ = data
-#     meanDatasetR += torch.mean(input.real, dim=(0, 2, 3))
-#     #meanDatasetI += torch.mean(input.imag, dim=(0, 2, 3))
-#     stdDatasetR += torch.std(input.real, dim=(0,2,3))
-#     #stdDatasetI += torch.std(input.imag, dim=(0,2,3))
-# meanDatasetR /= len(trainLoader)
-# #meanDatasetI /= len(trainLoader)
-# stdDatasetR /= len(trainLoader)
-# #stdDatasetI /= len(trainLoader)
+""" meanDatasetR, stdDatasetR = 0.0, 0.0
+#meanDatasetI, stdDatasetI = 0.0, 0.0
+for i, data in enumerate(trainLoader):
+    input, _ = data
+    meanDatasetR += torch.mean(input, dim=(0, 2, 3))
+    #meanDatasetI += torch.mean(input.imag, dim=(0, 2, 3))
+    stdDatasetR += torch.std(input, dim=(0,2,3))
+    #stdDatasetI += torch.std(input.imag, dim=(0,2,3))
+meanDatasetR /= len(trainLoader)
+#meanDatasetI /= len(trainLoader)
+stdDatasetR /= len(trainLoader)
+#stdDatasetI /= len(trainLoader) """
 
 #model = models.simpleCNN(device, imChannels, imSize)
-model = models.simpleFCNN(device, imChannels, imSize)
-#model = models.simpleDCNN(device, imChannels, imSize)
+#model = models.simpleFCNN(device, imChannels, imSize)
+model = models.simpleDCNN(device, imChannels, imSize)
 #model = models.fftLinear(in_features=imSize*imSize, layer1_out_features=1024, miniblock=8, device=device)
-#model = models.FFTConv(imChannels=imChannels, imSize=imSize, miniblock=2, device=device)
+#model = models.FFTConv(imChannels=imChannels, imSize=imSize, miniblock=4, device=device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
-#scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.5)
+#scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=0.1)
 
 # load checkpoint
-# checkpoint = torch.load('models/mnist_fourier_0528_1733_1e-05_20_100_chkPnt.tar', weights_only=True)
-# model.load_state_dict(checkpoint['model_state_dict'])
-# optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-# epoch = checkpoint['epoch']
-# loss = checkpoint['loss']
+""" checkpoint = torch.load('models/cifar10BW_fourier_0606_1224_1e-05_32_98_chkPnt.tar', weights_only=True)
+model.load_state_dict(checkpoint['model_state_dict'])
+optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+epoch = checkpoint['epoch']
+loss = checkpoint['loss'] """
 
 def train_one_epoch(epochIdx):
     running_loss = 0.
