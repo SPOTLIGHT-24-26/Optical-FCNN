@@ -116,9 +116,11 @@ class simpleFCNN(ONNBaseModel):
         self.conv1 = onn.layers.FourierConv2d(
             in_channels=imChannels,
             out_channels=32,
-            kernel_size=3,
             pool_size=self.poolSize,
             bias=True,
+            miniblock=8,
+            groups = 2,
+            sum_channels=False,  # sum all input channels
             mode="weight",
             dtype=torch.cfloat,
             photodetect=False,
@@ -127,11 +129,12 @@ class simpleFCNN(ONNBaseModel):
         self.poolSize -= 2
         self.denseLayerDims = self.poolSize//2
         self.conv2 = onn.layers.FourierConv2d(
-            in_channels=1,
+            in_channels=32,
             out_channels=64,
-            kernel_size=3,
             pool_size=self.denseLayerDims,
             bias=True,
+            miniblock=8,
+            sum_channels=False,  # sum all input channels
             mode="weight",
             dtype=torch.cfloat,
             photodetect=False,
@@ -182,7 +185,7 @@ class simpleFCNN(ONNBaseModel):
         #x = self.EOActivation(self.conv2(x))
         x = self.swish(self.conv1(x))
         # Combiner network simulation to sum all input channels
-        x = torch.sum(x, 1, keepdim=True)
+        #x = torch.sum(x, 1, keepdim=True)
         x = self.swish(self.conv2(x))
         x = x.flatten(1)
         #x = self.EOActivation(self.linear1(x))
@@ -345,39 +348,39 @@ class simpleDCNN(nn.Module):
             f"num_channels should contain as many elements as num_layers"
         )
 
-        self.convs = []
-        for i in range(self.num_layers):
-            self.convs.append(nn.Conv2d(
-                in_channels=self.num_channels[i],
-                out_channels=self.num_channels[i+1],
-                kernel_size=self.kernel_size,
-                stride=1,
-                padding=0,
-                dilation=1,
-                bias=True,
-                device=device
-            ))
+        # self.convs = []
+        # for i in range(self.num_layers):
+        #     self.convs.append(nn.Conv2d(
+        #         in_channels=self.num_channels[i],
+        #         out_channels=self.num_channels[i+1],
+        #         kernel_size=self.kernel_size,
+        #         stride=1,
+        #         padding=0,
+        #         dilation=1,
+        #         bias=True,
+        #         device=device
+        #     ))
 
-        # self.conv1 = nn.Conv2d(
-        #     in_channels=imChannels,
-        #     out_channels=32,
-        #     kernel_size=self.kernel_size,
-        #     stride=1,
-        #     padding=0,
-        #     dilation=1,
-        #     bias=True,
-        #     device=device
-        # )
-        # self.conv2 = nn.Conv2d(
-        #     in_channels=32,
-        #     out_channels=64,
-        #     kernel_size=self.kernel_size,
-        #     stride=1,
-        #     padding=0,
-        #     dilation=1,
-        #     bias=True,
-        #     device=device
-        # )
+        self.conv1 = nn.Conv2d(
+            in_channels=1,
+            out_channels=32,
+            kernel_size=self.kernel_size,
+            stride=1,
+            padding=0,
+            dilation=1,
+            bias=True,
+            device=device
+        )
+        self.conv2 = nn.Conv2d(
+            in_channels=1,
+            out_channels=64,
+            kernel_size=self.kernel_size,
+            stride=1,
+            padding=0,
+            dilation=1,
+            bias=True,
+            device=device
+        )
         self.pool = nn.MaxPool2d(2)
         denseLayerDims = (imSize - self.num_layers*(self.kernel_size-1))//2
         self.linear1 = nn.Linear(
@@ -402,10 +405,11 @@ class simpleDCNN(nn.Module):
 
     def forward(self, x):
         # conv layers
-        for i in range(self.num_layers):
-            x = self.swish(self.convs[i](x))
-        # x = self.swish(self.conv1(x))
-        # x = self.swish(self.conv2(x))
+        # for i in range(self.num_layers):
+        #     x = self.swish(self.convs[i](x))
+        x = self.swish(self.conv1(x))
+        x = torch.sum(x, 1, keepdim=True)
+        x = self.swish(self.conv2(x))
         x = self.pool(x)
         x = x.flatten(1)
         # FC layers
