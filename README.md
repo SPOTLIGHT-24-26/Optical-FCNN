@@ -1,7 +1,7 @@
 # Optical Fourier CNNs
 Simulation and Validation of Optical Fourier Convolution Neural Networks (OFCNN). Simple package contianing only 4 code files:
 - models.py => defines the different CNNs defined for Photonic Integrated Circuits (PIC) simulations and standard CNNs implemented using Pytorch
-- data_loader.py => Load MNIST or FMNIST dataset with corresponding transformations
+- data_loader.py => Load MNIST, FMNIST, or CIFAR10 dataset with corresponding transformations
 - mnist_tests.py => (main file) Train various optical and non-optical CNNs
     - Train the CNN of choice on the dataset of choice by uncommenting aprropriate code lines at the beginning of the file
 - result_plots.py => Plot the training and validation losses and accuracies
