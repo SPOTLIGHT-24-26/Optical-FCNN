@@ -50,7 +50,7 @@ imChannels = 1 """
 
 numComponents = 32
 
-# Name says 'mnist', but can load cifar10 in BW and color modes and fashion-mnist in both spatial and Fourier modes
+# Name says 'mnist', but can load cifar10 in BW, color, spatial, and Fourier modes and fashion-mnist in both spatial and Fourier modes
 mnistData =  data_loader.MnistData(dataName, mode, batch_size, numComponents=numComponents)
 trainLoader, testLoader = mnistData.getDataLoaders()
 
@@ -70,7 +70,7 @@ stdDatasetR /= len(trainLoader)
 
 #model = models.simpleCNN(device, imChannels, imSize)
 #model = models.simpleFCNN(device, imChannels, imSize)
-model = models.simpleDCNN(device, imSize)
+model = models.simpleDCNN(device, imChannels, imSize)
 #model = models.fftLinear(in_features=imSize*imSize, layer1_out_features=1024, miniblock=8, device=device)
 #model = models.FFTConv(imChannels=imChannels, imSize=imSize, miniblock=4, device=device)
 
