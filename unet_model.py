@@ -32,11 +32,44 @@ class u_net(ONNBaseModel):
 
         self.imSize = imSize
         self.numClasses = numClasses
-
-        # contractive path
-        # first set
         self.img_target = img_target
         self.poolSize = self.imSize
+
+        def conv_block(in_channels, out_channels, groups, pool_size, first=False):
+            if first:
+                groups1 = 1
+            else:
+                groups1 = groups
+            
+            conv1 = onn.layers.FourierConv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                groups = groups1,
+                pool_size=pool_size,
+                bias=True,
+                miniblock=8,
+                mode="weight",
+                dtype=torch.cfloat,
+                photodetect=False,
+                device=device
+            )
+            conv2 = onn.layers.FourierConv2d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                groups = groups,
+                pool_size=pool_size,
+                bias=True,
+                miniblock=8, 
+                mode="weight",
+                dtype=torch.cfloat,
+                photodetect=False,
+                device=device
+            )
+
+            return nn.Sequential(conv1, )
+        # contractive path
+        # first set
+        
         self.convd11 = onn.layers.FourierConv2d(
             in_channels=imChannels,
             out_channels=16,
@@ -55,8 +88,7 @@ class u_net(ONNBaseModel):
             groups = 4,
             pool_size=self.poolSize,
             bias=True,
-            miniblock=8,
-            sum_channels=False,  
+            miniblock=8, 
             mode="weight",
             dtype=torch.cfloat,
             photodetect=False,

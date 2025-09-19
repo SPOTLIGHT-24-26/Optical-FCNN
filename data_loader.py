@@ -65,7 +65,7 @@ class MnistData():
         
         if mode == 'fourier':
             transformsList.append(
-                transforms.Lambda(lambda x: torch.fft.fftshift(torch.fft.fft2(x, norm="forward"), dim=(-2,-1)))
+                transforms.Lambda(lambda x: torch.fft.fftshift(torch.fft.fft2(x), dim=(-2,-1)))
             )
             transformsList.append(transforms.CenterCrop(numComponents))
         
