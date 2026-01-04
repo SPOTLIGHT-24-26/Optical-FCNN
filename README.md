@@ -1,3 +1,17 @@
+# Citation
+This code refers to the following publication:
+'''
+@InProceedings{Puligandla_2025_ICCV,
+    author    = {Puligandla, Venkata Anirudh and Ceperic, Vladimir and Knezevic, Tihomir},
+    title     = {Scalable Optical Convolutional Neural Networks For Edge Applications},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) Workshops},
+    month     = {October},
+    year      = {2025},
+    pages     = {1724-1733}
+}
+'''
+Please cite the paper if you find this useful.
+
 # Optical Fourier CNNs
 Simulation and Validation of Optical Fourier Convolution Neural Networks (OFCNN). Simple package contianing only 4 code files:
 - models.py => defines the different CNNs defined for Photonic Integrated Circuits (PIC) simulations and standard CNNs implemented using Pytorch
