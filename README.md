@@ -1,6 +1,6 @@
 # Citation
 This code refers to the following publication:
-'''
+```
 @InProceedings{Puligandla_2025_ICCV,
     author    = {Puligandla, Venkata Anirudh and Ceperic, Vladimir and Knezevic, Tihomir},
     title     = {Scalable Optical Convolutional Neural Networks For Edge Applications},
@@ -9,7 +9,7 @@ This code refers to the following publication:
     year      = {2025},
     pages     = {1724-1733}
 }
-'''
+```
 Please cite the paper if you find this useful.
 
 # Optical Fourier CNNs
