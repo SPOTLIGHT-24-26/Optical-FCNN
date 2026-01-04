@@ -1,5 +1,5 @@
 # Citation
-This code refers to the following publication:
+This code refers to the following "most innovative paper" award winning publication:
 ```
 @InProceedings{Puligandla_2025_ICCV,
     author    = {Puligandla, Venkata Anirudh and Ceperic, Vladimir and Knezevic, Tihomir},
