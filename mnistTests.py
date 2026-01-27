@@ -18,7 +18,7 @@ EPOCHS = 100
 lr = 1e-4
 moment = 0.99
 
-best_vloss = 1_000_000.
+best_vloss = 1_000_000.0
 best_vacc = 0.0
 bestEpochNum = 0
 timestamp = datetime.now().strftime('%m%d_%H%M')
@@ -31,6 +31,7 @@ timeAccumulator = [0.]
 
 # --------------------------Data Parameters--------------------------
 mode = 'fourier'
+#mode = 'rfft'
 #mode = 'spatial'
 #mode = 'fftLin'
 #Note : fftlin is similar to spatial/digital but flattens the images
@@ -39,7 +40,7 @@ mode = 'fourier'
 imSize = 32
 imChannels = 3 """
 dataName = 'cifar10BW'
-imSize = 32
+imSize = 16
 imChannels = 1
 """ dataName = 'mnist'
 imSize = 14
@@ -48,14 +49,17 @@ imChannels = 1 """
 imSize = 28
 imChannels = 1 """
 
-numComponents = 32
+imSize = np.repeat(imSize, 2)
+if mode == 'rfft':
+    imSize[1] = imSize[1]//2
+numComponents = imSize
 
 # Name says 'mnist', but can load cifar10 in BW, color, spatial, and Fourier modes and fashion-mnist in both spatial and Fourier modes
 mnistData =  data_loader.MnistData(dataName, mode, batch_size, numComponents=numComponents)
 trainLoader, testLoader = mnistData.getDataLoaders()
 
 # Calculate dataset's mean and std
-""" meanDatasetR, stdDatasetR = 0.0, 0.0
+'''meanDatasetR, stdDatasetR = 0.0, 0.0
 #meanDatasetI, stdDatasetI = 0.0, 0.0
 for i, data in enumerate(trainLoader):
     input, _ = data
@@ -66,7 +70,7 @@ for i, data in enumerate(trainLoader):
 meanDatasetR /= len(trainLoader)
 #meanDatasetI /= len(trainLoader)
 stdDatasetR /= len(trainLoader)
-#stdDatasetI /= len(trainLoader) """
+#stdDatasetI /= len(trainLoader)'''
 
 #model = models.simpleCNN(device, imChannels, imSize)
 model = models.simpleFCNN(device, imChannels, imSize)
@@ -104,7 +108,7 @@ def train_one_epoch(epochIdx):
         if i % 100 == 99:
             last_loss = running_loss / 100
             last_acc = running_acc / 100
-            print('  batch {} loss: {} acc: {}'.format(i + 1, last_loss, last_acc))
+            #print('  batch {} loss: {} acc: {}'.format(i + 1, last_loss, last_acc))
             running_loss = 0.
             running_acc = 0.
     

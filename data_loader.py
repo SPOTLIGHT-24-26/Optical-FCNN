@@ -1,7 +1,7 @@
 import torch
 from torchvision.datasets import MNIST, CIFAR10, FashionMNIST
 from torch.utils.data import DataLoader
-import torchvision.transforms as transforms
+import torchvision.transforms.v2 as transforms
 from torch.types import Device
 
 from pyutils.general import logger
@@ -11,7 +11,7 @@ class MnistData():
                  dataName: str = 'mnist',
                  mode: str = 'spatial',
                  batchSize: int = 64,
-                 numComponents: int = None
+                 numComponents: list = None
                  ):
         '''
         Although the name is 'MnistData', this class loads. MNIST, FashionMNIST and CIFAR10 data in grayscale and color.
@@ -30,11 +30,11 @@ class MnistData():
             f"data not supported. Expected one from (mnist, fmnist, cifar10, cifar10BW) but got {dataName}."
         )
         # assert mode is valid
-        assert mode in {'spatial', 'fourier', 'fftLin'}, logger.error(
-            f"Mode not supported. Expected one from (spatial, fourier, 'fftLin') but got {mode}."
+        assert mode in {'spatial', 'fourier', 'fftLin', 'rfft'}, logger.error(
+            f"Mode not supported. Expected one from (spatial, fourier, fftLin, rfft) but got {mode}."
         )
         # assert if mode=fourier, numcomponents is not none
-        if mode == 'fourier':
+        if mode == 'fourier' or mode == 'rfft':
             assert numComponents is not None, logger.error(
                 f"fourier mode selected, but numcomponents is not passed. Please pass \
                 original image size as numComponenets if all fourier componenets are to be considered."
@@ -45,7 +45,8 @@ class MnistData():
 
         # Setup data and target transforms
         transformsList = []
-        transformsList.append(transforms.ToTensor())
+        transformsList.append(transforms.ToImage())
+        transformsList.append(transforms.ToDtype(torch.float32, scale=True))
         if dataName == 'mnist':
             transformsList.append(transforms.Normalize((0.1307,), (0.3081,)))
         elif dataName == 'fmnist':
@@ -53,9 +54,11 @@ class MnistData():
         elif dataName == 'cifar10Color':
             transformsList.append(transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)))
         elif dataName == 'cifar10BW':
-            transformsList.append(transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)))
+            # Grayscale scales the images to [0,1]
+            # For the transformed dataset:
+            # mean = 0.4808, std = 0.2385
             transformsList.append(transforms.Grayscale())
-            transformsList.append(transforms.Normalize((-0.0001), (0.9679)))
+            #transformsList.append(transforms.Normalize(mean=[0.4808], std=[0.2385]))
         else:
             # default case, normalize with mean=0.5 and std=0.5
             transformsList.append(transforms.Normalize((0.5), (0.5)))
@@ -65,10 +68,15 @@ class MnistData():
         
         if mode == 'fourier':
             transformsList.append(
-                transforms.Lambda(lambda x: torch.fft.fftshift(torch.fft.fft2(x), dim=(-2,-1)))
+                transforms.Lambda(lambda x: torch.fft.fftshift(torch.fft.fft2(x, norm="ortho"), dim=(-2,-1)))
             )
-            transformsList.append(transforms.CenterCrop(numComponents))
-        
+            transformsList.append(transforms.CenterCrop(self.numComponents))
+        if mode == 'rfft':
+            transformsList.append(
+                transforms.Lambda(lambda x: torch.fft.fftshift(torch.fft.rfft2(x, norm="ortho"), dim=(-2,-1)))
+            )
+            transformsList.append(transforms.CenterCrop(self.numComponents))
+
         self.dataTransform = transforms.Compose(transformsList)
         self.targetTransform = transforms.Lambda(
             lambda y: torch.zeros(10,dtype=torch.float).scatter_(0, torch.tensor(y), value=1)

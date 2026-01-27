@@ -100,7 +100,7 @@ class simpleFCNN(ONNBaseModel):
     def __init__(self,
                  device=torch.device("cpu"),
                  imChannels: int = 1,
-                 imSize: int = 28
+                 imSize: list = [28, 28]
                  ):
         super().__init__()
 
@@ -117,7 +117,7 @@ class simpleFCNN(ONNBaseModel):
             in_channels=imChannels,
             out_channels=32,
             pool_size=self.poolSize,
-            bias=True,
+            bias=False,
             miniblock=8,
             sum_channels=False,  # sum all input channels
             mode="weight",
@@ -130,8 +130,9 @@ class simpleFCNN(ONNBaseModel):
         self.conv2 = onn.layers.FourierConv2d(
             in_channels=32,
             out_channels=64,
+            groups = 8,
             pool_size=self.denseLayerDims,
-            bias=True,
+            bias=False,
             miniblock=8,
             sum_channels=False,  # sum all input channels
             mode="weight",
@@ -139,10 +140,12 @@ class simpleFCNN(ONNBaseModel):
             photodetect=False,
             device=device
         )
+        #self.pool = onn.layers.MaxPool(2, dtype=torch.cfloat, device=device)
+        #self.pool = onn.layers.AdaptiveAvgPool(self.poolSize//2, dtype=torch.cfloat, device=device)
         self.linear1 = onn.layers.MZIBlockLinear(
-            in_features=64*self.denseLayerDims*self.denseLayerDims,
+            in_features=64*np.prod(self.denseLayerDims),
             out_features=128,
-            bias=True,
+            bias=False,
             miniblock=8,
             mode="usv",
             decompose_alg="clements",
@@ -153,11 +156,11 @@ class simpleFCNN(ONNBaseModel):
         self.linear2 = onn.layers.MZIBlockLinear(
             in_features=128,
             out_features=10,
-            bias=True,
+            bias=False,
             miniblock=8,
             mode="usv",
             decompose_alg="clements",
-            photodetect=True,
+            photodetect=False,
             dtype=torch.cfloat,
             device=device,
         )
@@ -177,18 +180,22 @@ class simpleFCNN(ONNBaseModel):
     
     def swish(self, x):
         return x*torch.sigmoid(x)
+    
+    def mish(self, x):
+        return x * torch.tanh(torch.log(1 + torch.exp(x)))
 
     def forward(self, x):
         # EOActivation has discrepancies near 0. Swish helps in better training
         #x = self.EOActivation(self.conv1(x))
         #x = self.EOActivation(self.conv2(x))
-        x = self.swish(self.conv1(x))
+        x = self.mish(self.conv1(x))
         # Combiner network simulation to sum all input channels
         #x = torch.sum(x, 1, keepdim=True)
-        x = self.swish(self.conv2(x))
+        x = self.mish(self.conv2(x))
+        #x = self.pool(x)
         x = x.flatten(1)
         #x = self.EOActivation(self.linear1(x))
-        x = self.swish(self.linear1(x))
+        x = self.mish(self.linear1(x))
         x = self.linear2(x)
         x = torch.square(x.real) + torch.square(x.imag)
         return x
@@ -344,7 +351,7 @@ class simpleDCNN(nn.Module):
             stride=1,
             padding=0,
             dilation=1,
-            bias=True,
+            bias=False,
             device=device
         )
         self.conv2 = nn.Conv2d(
@@ -354,21 +361,21 @@ class simpleDCNN(nn.Module):
             stride=1,
             padding=0,
             dilation=1,
-            bias=True,
+            bias=False,
             device=device
         )
         self.pool = nn.MaxPool2d(2)
         denseLayerDims = (imSize - 4)//2
         self.linear1 = nn.Linear(
-            in_features=64*denseLayerDims*denseLayerDims,
+            in_features=64*np.prod(denseLayerDims),
             out_features=128,
-            bias=True,
+            bias=False,
             device=device,
         )
         self.linear2 = nn.Linear(
             in_features=128,
             out_features=10,
-            bias=True,
+            bias=False,
             device=device,
         )
 
@@ -391,7 +398,7 @@ class simpleDCNN(nn.Module):
         #torch.cuda.synchronize()
         #t0 = time.time()
         x = self.swish(self.linear1(x))
-        x = torch.square(torch.abs(self.linear2(x)))
+        x = torch.square(self.linear2(x))
         #torch.cuda.synchronize()
         #t1 = time.time()
         #self.fcTime = t1-t0
